@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Fetch every public Velog post. No packages or API key required."""
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from urllib.request import Request, urlopen
 from urllib.parse import quote
@@ -30,4 +31,5 @@ path = ROOT / 'data/posts.json'
 temp = path.with_suffix('.tmp')
 temp.write_text(json.dumps(posts, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 temp.replace(path)
+(ROOT / 'data/posts-meta.json').write_text(json.dumps({'collected_at': datetime.now(timezone.utc).isoformat(), 'count': len(posts)}, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 print(f'Updated {len(posts)} Velog posts → data/posts.json')

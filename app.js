@@ -11,4 +11,43 @@ $('#theme').onclick=()=>{const next=document.documentElement.dataset.theme==='da
 $('#year').textContent=new Date().getFullYear();
 const projects=[{name:'cuda-gemm-optim',label:'01 / GPU COMPUTING',title:'CUDA GEMM Optimization',description:'Naive 커널에서 tiling과 register blocking까지. 행렬 곱셈을 단계적으로 최적화하고 cuBLAS와 성능을 비교합니다.',tags:['CUDA','C++','Benchmark'],art:'matrix'},{name:'triton-attention-study',label:'02 / EFFICIENT DEEP LEARNING',title:'Triton Attention Study',description:'Triton으로 GPU 프로그래밍을 공부하며, Attention 연산의 구현과 효율을 탐구합니다.',tags:['Triton','Python','Attention'],art:'attention'},{name:'OS',label:'03 / SYSTEM FUNDAMENTALS',title:'Operating Systems',description:'운영체제 프로젝트를 통해 시스템의 동작 원리를 코드로 살펴봅니다.',tags:['C','Operating Systems'],art:'system'}];
 for(const p of projects){const a=external(document.createElement('a'));a.className='project';a.href=`https://github.com/valentinho02/${p.name}`;const art=document.createElement('div');art.className='project-art '+p.art;art.setAttribute('aria-hidden','true');for(let i=0;i<36;i++){const el=document.createElement('i');el.style.setProperty('--i',i);art.append(el);}const body=document.createElement('div');body.className='project-body';const label=document.createElement('small');label.textContent=p.label;const h=document.createElement('h3');h.textContent=p.title+' ↗';const desc=document.createElement('p');desc.textContent=p.description;const tags=document.createElement('div');tags.className='tags';p.tags.forEach(t=>{const s=document.createElement('span');s.textContent=t;tags.append(s);});body.append(label,h,desc,tags);a.append(art,body);$('#project-list').append(a);}
-fetch('data/posts.json').then(r=>{if(!r.ok)throw Error();return r.json();}).then(data=>{posts=data;render();}).catch(()=>{$('#count').textContent='글 목록을 불러오지 못했습니다. 새로고침하거나 Velog를 방문해주세요.';});
+// Read the newest published snapshot without reusing the browser cache.
+let refreshing = false;
+async function refreshPosts(manual = false) {
+  if (refreshing) return;
+  refreshing = true;
+  const button = $('#refresh-posts');
+  button.disabled = true;
+  button.textContent = '↻ 불러오는 중…';
+  $('#sync-status').textContent = '최근 수집된 글 목록을 확인하고 있습니다.';
+  try {
+    const stamp = Date.now();
+    const response = await fetch(`data/posts.json?t=${stamp}`, {cache: 'no-store', signal: AbortSignal.timeout(15000)});
+    if (!response.ok) throw Error('Could not load posts');
+    const data = await response.json();
+    if (!Array.isArray(data) || !data.length || data.some(p => typeof p.title !== 'string' || !Array.isArray(p.tags) || !/^\d{4}-\d{2}-\d{2}$/.test(p.date) || typeof p.url !== 'string' || !p.url.startsWith('https://velog.io/@valentinho/'))) throw Error('Invalid posts');
+    const previous = new Set(posts.map(p => p.id));
+    const added = data.filter(p => !previous.has(p.id)).length;
+    posts = data;
+    render();
+    let collected = '';
+    try {
+      const meta = await fetch(`data/posts-meta.json?t=${stamp}`, {cache: 'no-store', signal: AbortSignal.timeout(5000)});
+      if (meta.ok) {
+        const value = await meta.json();
+        const date = new Date(value.collected_at);
+        if (!Number.isNaN(date.getTime())) collected = ` · 수집: ${date.toLocaleString('ko-KR', {month:'numeric', day:'numeric', hour:'2-digit', minute:'2-digit'})}`;
+      }
+    } catch { /* A missing timestamp must not hide a successfully loaded list. */ }
+    $('#sync-status').textContent = (manual ? (added ? `새 글 ${added}편을 불러왔습니다.` : '최근 수집된 목록입니다. 새 글이 없다면 다음 자동 수집을 기다려주세요.') : `Velog 글 ${posts.length}편`) + collected;
+  } catch {
+    $('#sync-status').textContent = '목록을 불러오지 못했습니다. 잠시 후 다시 시도해주세요.';
+    if (!posts.length) $('#count').textContent = '글 목록 연결을 확인해주세요. Velog에서 원문을 볼 수 있습니다.';
+  } finally {
+    refreshing = false;
+    button.disabled = false;
+    button.textContent = '↻ 글 목록 새로고침';
+  }
+}
+$('#refresh-posts').onclick = () => refreshPosts(true);
+refreshPosts();
