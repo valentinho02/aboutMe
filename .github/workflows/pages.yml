@@ -23,6 +23,7 @@ jobs:
           mkdir -p _site/data
           cp index.html app.js style.css favicon.svg _site/
           cp data/posts.json data/posts-meta.json _site/data/
+          cp -R assets _site/assets
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
